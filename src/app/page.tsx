@@ -1,11 +1,13 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Upload, User, MessageSquare, Star, ArrowRight } from 'lucide-react'
+import { useAuthStore } from '@/lib/store'
+import { supabase } from '@/lib/supabase'
 
 // Enhanced Components
 import { FormField } from '@/components/FormField'
@@ -23,6 +25,21 @@ export default function HomePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const { user, freeGenerationsLeft, setUser, setFreeGenerationsLeft } = useAuthStore()
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        setUser(session.user)
+      } else {
+        setUser(null)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [setUser])
 
   const { 
     register, 
@@ -47,11 +64,20 @@ export default function HomePage() {
   const onSubmit = async (data: FormData) => {
     setIsSubmitting(true)
     
+    if (!user && freeGenerationsLeft <= 0) {
+      // Show login modal or redirect to signup
+      return
+    }
+
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 3000))
       setIsSuccess(true)
       
+      if (!user) {
+        setFreeGenerationsLeft(freeGenerationsLeft - 1)
+      }
+
       // Reset success state after 3 seconds
       setTimeout(() => setIsSuccess(false), 3000)
     } catch (error) {
@@ -143,11 +169,18 @@ export default function HomePage() {
           <div className="flex items-center gap-4 md:gap-6">
             <motion.div 
               className="flex items-center gap-2 text-gray-600 hover:text-blue-600 cursor-pointer transition-colors duration-200"
+              onClick={async () => {
+                if (user) {
+                  await supabase.auth.signOut()
+                } else {
+                  // Show login modal
+                }
+              }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
               <img src="https://ext.same-assets.com/3111735015/3783633550.svg" alt="" className="w-4 h-4" />
-              <span className="hidden sm:inline">Connexion</span>
+              <span className="hidden sm:inline">{user ? 'Déconnexion' : 'Connexion'}</span>
             </motion.div>
             <motion.div 
               className="flex items-center gap-2 text-gray-600 hover:text-blue-600 cursor-pointer transition-colors duration-200"
@@ -202,10 +235,15 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.7 }}
+            onClick={() => {
+              const formSection = document.getElementById('form-section')
+              if (formSection) {
+                formSection.scrollIntoView({ behavior: 'smooth' })
+              }
+            }}
           >
             <Button 
               className="bg-blue-500 hover:bg-blue-600 text-white px-6 md:px-8 py-3 text-base md:text-lg rounded-md group transition-all duration-300"
-              onClick={() => document.getElementById('form-section')?.scrollIntoView({ behavior: 'smooth' })}
             >
               Je crée gratuitement ma lettre
               <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform duration-200" />
